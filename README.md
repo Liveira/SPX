@@ -1,2 +1,1 @@
-# SPX
-Discord bot.
+vou fazer tudo em um arquivo memo fdskkk se reclamar fodase n vou mudar do mesmo jeito
