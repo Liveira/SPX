@@ -34,13 +34,14 @@ avatar = [
     "https://cdn.discordapp.com/attachments/850535990102982696/850742943022186526/1f622.png",
     "https://cdn.discordapp.com/attachments/850535990102982696/850743044726849586/1f914.png",
     "https://cdn.discordapp.com/attachments/850535990102982696/850743075759194152/1f644.png"
-    ]
+]
 
 SPX = mongo["Usuarios"]
 SPXU = SPX["SPXUSERS"]
 SPXS = SPX["SPXSERVERS"]
 SPXB = SPX["SPXBL"]
 
+avatarcont = 0
 
 p = discord.Colour.from_rgb(114, 137, 218)
 
@@ -58,7 +59,6 @@ def prefix(bot,message):
     except:
         prefix = "!!"
     return commands.when_mentioned_or(prefix)(bot, message)
-
 
 
 bot = commands.AutoShardedBot(command_prefix=prefix,intents=Intents.all(),case_insensitive=True)
@@ -162,6 +162,10 @@ def get_prefix(idguild) -> str:
 
 @tasks.loop(seconds=300)
 async def change_avatar() -> None:
+    global avatarcont
+    if avatarcont == 0:
+        avatarcont += 1
+        return
     await bot.user.edit(avatar=requests.get(random.choice(avatar)).content)
 
 async def send_stuff(file=None) -> discord.Message:
@@ -191,7 +195,8 @@ async def on_message(message: discord.Message) -> None:
     if message.content in [f"<@!{bot.user.id}>",f"<@{bot.user.id}>"]:
         await message.channel.send(f"Olá! Você me chamou? Use `{get_prefix(message.guild.id)}help` para saber meus comandos!")
     await bot.process_commands(message)
-class Utils(commands.Cog):
+
+class Utilidade(commands.Cog):
     
     @commands.command(name='help', description="Comando de ajuda",aliases=["ajuda","h","a","ajd","ajudinhaae"])
     @commands.cooldown(1,5,commands.BucketType.user)
@@ -205,7 +210,7 @@ class Utils(commands.Cog):
         else:
             try:
                 command: commands.Command = bot.get_command(command_)
-                embed = discord.Embed(title=f'{command.name}',description=command.description if command.description != '' or command.description != None else "Esse comando não tem nenhuma descrição :/")
+                embed = discord.Embed(title=f'{command.name.title()} \ {command.cog_name}',description=command.description if command.description != '' or command.description != None else "Esse comando não tem nenhuma descrição :/")
                 embed.color = p
                 embed.add_field(name='Como usar?',value=f'{command.help.replace("!!",get_prefix(ctx.guild.id)) if command.help != None else "Esse comando não tem ajuda..."}')
                 embed.add_field(name='Alternativas',value=', '.join(command.aliases) if command.aliases != None or command.aliases != [] else "Esse comando não tem alternativas")
@@ -299,5 +304,5 @@ class ServerManagement(commands.Cog):
 
 
 bot.add_cog(ServerManagement(bot))
-bot.add_cog(Utils(bot))
+bot.add_cog(Utilidade(bot))
 bot.run(config["token"])
