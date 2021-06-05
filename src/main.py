@@ -5,6 +5,7 @@ from typing import Type
 import typing
 import discord,pymongo,json,osuapi,requests,re,os
 from discord.errors import HTTPException
+from discord.ext import tasks
 from PIL import Image as img, ImageDraw
 from PIL import ImageFont as imgfont
 from PIL import ImageDraw as imgdraw
@@ -22,6 +23,18 @@ config = json.load(enc)
 mongo = pymongo.MongoClient(config["mongo"])
 
 osu = osuapi.OsuApi(config['osu'], connector=osuapi.ReqConnector())
+
+avatar = [
+    "https://cdn.discordapp.com/attachments/850535990102982696/850722579299303424/1f97a.png"
+    ,"https://cdn.discordapp.com/attachments/850535990102982696/850722698359603220/1f640.png"
+    ,"https://cdn.discordapp.com/attachments/850535990102982696/850719817484861450/1f631.png",
+    "https://cdn.discordapp.com/attachments/850535990102982696/850742760301396028/1f60e.png",
+    "https://cdn.discordapp.com/attachments/850535990102982696/850742778363510814/1f60f.png",
+    "https://cdn.discordapp.com/attachments/850535990102982696/850742912534577162/1f62d.png",
+    "https://cdn.discordapp.com/attachments/850535990102982696/850742943022186526/1f622.png",
+    "https://cdn.discordapp.com/attachments/850535990102982696/850743044726849586/1f914.png",
+    "https://cdn.discordapp.com/attachments/850535990102982696/850743075759194152/1f644.png"
+    ]
 
 SPX = mongo["Usuarios"]
 SPXU = SPX["SPXUSERS"]
@@ -147,6 +160,10 @@ def blacklist():
 def get_prefix(idguild) -> str:
     return DadosS(idguild)['prefix'] or "!!"
 
+@tasks.loop(seconds=300)
+async def change_avatar() -> None:
+    await bot.user.edit(avatar=requests.get(random.choice(avatar)).content)
+
 async def send_stuff(file=None) -> discord.Message:
     return await bot.get_channel(850535990102982696).send(file=file)
 
@@ -167,6 +184,7 @@ async def on_ready() -> None:
     print(f"Servidores:")
     for x in serversname:
         print(x)
+    change_avatar.start()
 
 @bot.event
 async def on_message(message: discord.Message) -> None:
@@ -278,6 +296,8 @@ class ServerManagement(commands.Cog):
             return
         await ctx.send(f"Emoji adicionado: {str(em)}!\n{warning}")
         os.remove(f"temp/image{emoji_ext}")
+
+
 bot.add_cog(ServerManagement(bot))
 bot.add_cog(Utils(bot))
 bot.run(config["token"])
