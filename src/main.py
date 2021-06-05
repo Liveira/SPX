@@ -1,5 +1,6 @@
 from io import BytesIO
 from logging import exception
+from ntpath import join
 from typing import Type
 import typing
 import discord,pymongo,json,osuapi,requests,re,os
@@ -186,9 +187,14 @@ class Utils(commands.Cog):
         else:
             try:
                 command: commands.Command = bot.get_command(command_)
-                await ctx.send(f"**{command.name} / {command}**\n\nDescrição: **{command.description if command.description != '' else 'Nenhuma descrição fornecida' }**\nOutros nomes: **{str(command.aliases).replace('[','').replace(']','').replace('aspas','') if command.aliases != [] else 'Não tem variações'}**") 
-            except AttributeError:
-                await ctx.send("**:warning: | O comando não existe...**")
+                embed = discord.Embed(title=f'{command.name}',description=command.description if command.description != '' or command.description != None else "Esse comando não tem nenhuma descrição :/")
+                embed.color = p
+                embed.add_field(name='Como usar?',value=f'{command.help.replace("!!",get_prefix(ctx.guild.id)) if command.help != None else "Esse comando não tem ajuda..."}')
+                embed.add_field(name='Alternativas',value=', '.join(command.aliases) if command.aliases != None or command.aliases != [] else "Esse comando não tem alternativas")
+                embed.set_thumbnail(url=ctx.author.avatar_url)
+                await ctx.send(embed=embed) 
+            except Exception as ex:
+                await ctx.send(f"**:warning: | O comando não existe...**  {ex.args}")
 
     @commands.command(name="avatar", description="Veja o seu avatar ou o do seus amigos",aliases=['av','pfp'])
     @commands.cooldown(1,5,commands.BucketType.user)
@@ -223,7 +229,7 @@ class Utils(commands.Cog):
 
 class ServerManagement(commands.Cog):
 
-    @commands.command(name="addemoji", description="Adicione um emoji no servidor fácil!",aliases=['aemoji','adicionar_emoji'])
+    @commands.command(name="addemoji", description="Adicione um emoji no servidor fácil!",aliases=['aemoji','adicionar_emoji'],help=f"Exemplos:\n\nAdicionar um emoji com uma imagem:\n`!!addemoji flushed <arquivo>`\n\nAdicionar um emoji com um emoji de outro servidor (Precisa de nitro):\n`!!addemoji flushed :ultraflushed:`\n\nAdicionar um emoji com a foto de perfil de alguém:\n`!!addemoji burro @darky#0000`\n\nAdicionar um emoji com um link:\n`!!addemoji algo https:://coisas/imagem.png`\n\nFormatos aceitados: [PNG/JPEG/JPG/WEBM/GIF]")
     @commands.cooldown(1,5,commands.BucketType.user)
     @blacklist()
     async def addemoji(self,ctx:commands.Context,emojiname,IMAGEOPEN:typing.Union[discord.PartialEmoji, discord.Member, str]):
