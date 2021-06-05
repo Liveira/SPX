@@ -2,7 +2,7 @@ from io import BytesIO
 from logging import exception
 from typing import Type
 import typing
-import discord,pymongo,json,osuapi,requests,re
+import discord,pymongo,json,osuapi,requests,re,os
 from discord.errors import HTTPException
 from PIL import Image as img, ImageDraw
 from PIL import ImageFont as imgfont
@@ -44,6 +44,8 @@ def prefix(bot,message):
     except:
         prefix = "!!"
     return commands.when_mentioned_or(prefix)(bot, message)
+
+
 
 bot = commands.AutoShardedBot(command_prefix=prefix,intents=Intents.all(),case_insensitive=True)
 bot.remove_command("help")
@@ -143,6 +145,9 @@ def blacklist():
 
 def get_prefix(idguild) -> str:
     return DadosS(idguild)['prefix'] or "!!"
+
+async def send_stuff(file=None) -> discord.Message:
+    return await bot.get_channel(850535990102982696).send(file=file)
 
 @bot.event
 async def on_ready() -> None:
@@ -245,7 +250,7 @@ class ServerManagement(commands.Cog):
                 size = image.size
             frames = thumbnails(a,size)
             image = next(frames)
-            image.save(f"image{emoji_ext}",
+            image.save(f"temp/image{emoji_ext}",
                     save_all=True,
                     append_images=list(frames),
                     loop=0
@@ -253,12 +258,12 @@ class ServerManagement(commands.Cog):
         else:
             if RESIZE == True:
                 image = image.resize((256,256))
-            image.save(f"image{emoji_ext}")
+            image.save(f"temp/image{emoji_ext}")
         image.close()
-        arq = discord.File(open(f"image{emoji_ext}",'rb'))
-        a = await ctx.send(file=arq)
+        arq = discord.File(open(f"temp/image{emoji_ext}",'rb'))
+        a = await send_stuff(arq)
         link = a.attachments[0].url
-        await a.delete()
+        
         await m.edit(content="Imagem baixada :white_check_mark:")
         try:
             em = await ctx.guild.create_custom_emoji(name=emojiname.lower(),image=requests.get(link).content)
@@ -266,7 +271,7 @@ class ServerManagement(commands.Cog):
             await ctx.send("Infelizmente não consegui adicionar o emoji, o emoji é **extremamente pesado**, mesmo tentando fazer a compressão do arquivo não consegui adicionar.")
             return
         await ctx.send(f"Emoji adicionado: {str(em)}!\n{warning}")
-
+        os.remove(f"temp/image{emoji_ext}")
 bot.add_cog(ServerManagement(bot))
 bot.add_cog(Utils(bot))
 bot.run(config["token"])
