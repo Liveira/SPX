@@ -1,9 +1,10 @@
+import asyncio
 from io import BytesIO
 from logging import exception
 from ntpath import join
 from typing import Type
 import typing
-import discord,pymongo,json,osuapi,requests,re,os
+import discord,pymongo,json,osuapi,requests,re,os,osuapi
 from discord.errors import HTTPException
 from discord.ext import tasks
 from PIL import Image as img, ImageDraw
@@ -14,10 +15,10 @@ from discord.flags import Intents
 from discord.ext.commands.errors import CommandInvokeError, CommandNotFound
 from discord.ext import commands
 import time,random
-
+from mal import AnimeSearch
 enc = open("config.json","r",encoding="utf-8")
-
 config = json.load(enc)
+osuapi.OsuApi(config["osu"],connector=osuapi.ReqConnector())
 
 
 mongo = pymongo.MongoClient(config["mongo"])
@@ -198,7 +199,7 @@ async def on_message(message: discord.Message) -> None:
 
 class Utilidade(commands.Cog):
     
-    @commands.command(name='help', description="Comando de ajuda",aliases=["ajuda","h","a","ajd","ajudinhaae"])
+    @commands.command(name='help', description="Comando de ajuda",aliases=["ajuda","h","a","ajd","ajudinhaae"], help="Exemplos:\n\nMostra uma ajuda completa do comando selecionado\n`!!help ping`")
     @commands.cooldown(1,5,commands.BucketType.user)
     @blacklist()
     async def help(self,ctx:commands.Context,command_=None) -> None:
@@ -219,7 +220,7 @@ class Utilidade(commands.Cog):
             except Exception as ex:
                 await ctx.send(f"**:warning: | O comando não existe...**  {ex.args}")
 
-    @commands.command(name="avatar", description="Veja o seu avatar ou o do seus amigos",aliases=['av','pfp'])
+    @commands.command(name="avatar", description="Veja o seu avatar ou o do seus amigos",aliases=['av','pfp'],help='Exemplos:\n\nVeja o avatar de uma pessoa\n`!!avatar @darky#0000`')
     @commands.cooldown(1,5,commands.BucketType.user)
     @blacklist()
     async def avatar(self,ctx:commands.Context,user:discord.User=None) -> None:
@@ -229,7 +230,7 @@ class Utilidade(commands.Cog):
         embed.colour = p
         await ctx.send(embed=embed)
 
-    @commands.command(name="ping", description="Veja a latencia do bot, caso esteja lento em seus comandos.",aliases=['pong','<@!660193448711946262>','<@660193448711946262>',"latency","latencia"])
+    @commands.command(name="ping", description="Veja a latencia do bot, caso esteja lento em seus comandos.",aliases=['pong','<@!660193448711946262>','<@660193448711946262>',"latency","latencia"],help="Exemplos:\n\nVeja a latencia do bot caso ele esteja demorando para responder algum comando\n`!!ping`\n\n!Aviso! Caso o ping esteja alto, você pode avisar a nós no nosso servidor de suporte!")
     @commands.cooldown(1,5,commands.BucketType.user)
     @blacklist()
     async def ping(self,ctx:commands.Context) -> None:
@@ -249,7 +250,77 @@ class Utilidade(commands.Cog):
         elif max([ping,ping_db,int(bot.latency * 1000)]) > 100:
             status = ":+1: Bom"
         await a.edit(content=f":ping_pong: | **Latencia da API: {int(bot.latency * 1000)}ms**\n⠀⠀⠀⠀-> **Latencia do BOT: {int(ping)}ms**\n⠀⠀⠀⠀-> **Latencia do Banco de dados: {int(ping_db)}ms**\n{status}")
+  
+    @commands.command(name="wheater", description="Veja o clima da sua cidade",aliases=["clima","temperatura","temp","tempo"],help="Exemplos:\n\nVeja o clima da sua cidade\n`!!wheater <nome da cidade>`")
+    @commands.cooldown(1,5,commands.BucketType.user)
+    @blacklist()
+    async def weather(self,ctx:commands.Context,*,cidade) -> None:
+        req = requests.get(f"https://api.openweathermap.org/data/2.5/weather?q={cidade.replace(' ','%20')}&appid={config['wheater']}&units=metric")
+        if req.status_code != 200:
+            await ctx.send("Aconteceu um erro no REQUEST! Pode ter sido que você colocou o nome errado")
+            return
+        data = req.json()
+        embed=discord.Embed(title=f'Temperatura de {cidade}')
+        embed.color = p
+        embed.set_thumbnail(url=f'https://openweathermap.org/img/wn/{data["weather"][0]["icon"]}@2x.png')
+        embed.add_field(name='Temperatura',value=f"{round(data['main']['temp'])}°C")
+        embed.add_field(name='Sensação Térmica',value=f"{round(data['main']['feels_like'])}°C")
+        await ctx.send(embed=embed)
+        
+    @commands.command(name="recanime", description="Deixe o bot recomendar um anime para você!",aliases=['recomendar_anime','ranime'],help=f"Exemplos:\n\nDeixe o bot recomendar um anime para você!\n`!!recanime`")
+    @commands.cooldown(1,5,commands.BucketType.user)
+    @blacklist()
+    async def recanime(self,ctx):
+        m = await ctx.send("Pesquisando... :mag_right:")
+        url = "https://animechan.vercel.app/api/random"
+        json = requests.get(url).json()
+        a = AnimeSearch(json["anime"])
+        anime = a.results[0]
+        embed = discord.Embed(title=json["anime"],description=f"{anime.synopsis} Quer saber mais? [Clique aqui!]({anime.url})")
+        embed.set_thumbnail(url=anime.image_url)
+        embed.color = p
+        embed.set_footer(text="Quer mais informações? Reaja ✅")
+        await m.edit(content="Pronto!... ",embed=embed)
+        await m.add_reaction("✅")
+        def checkr(reaction,user):
+            return user == ctx.message.author and reaction.emoji == "✅" and ctx.channel == reaction.message.channel
+        try:
+            reac,user = await bot.wait_for('reaction_add',check=checkr,timeout=60)
+            embed.add_field(name="Avaliação",value=f"{anime.score} :star:")
+            embed.add_field(name="Numero de episodios",value=f"{anime.episodes}")
+            embed.add_field(name="Tipo do anime",value=f"{anime.type}")
+            embed.set_footer(text=f"")
+            await m.edit(embed=embed)
+            await m.clear_reactions()
+        except asyncio.TimeoutError:
+            await m.clear_reactions()
 
+    @commands.command(name="osu", description="Veja informações do seu perfil no osu", help="Exemplos\n\nVeja informações do seu perfil no osu\n`!!osu Darky`")
+    @commands.cooldown(1,5,commands.BucketType.user)
+    @blacklist()
+    async def osu(self,ctx,*,user):
+        try:
+            user = osu.get_user(user)[0]
+            embed = discord.Embed(title=user.username) 
+            embed.add_field(name='Perfomance/Ranking',value=f"PP: **{round(user.pp_raw)}**\nRanking: #**{user.pp_rank}** || País: #**{user.pp_country_rank}**\nPrecisão: **{int(user.accuracy)}%**\nTotal de partidas: **{user.playcount}** (LV{int(user.level)})\nTempo de jogo: {user.total_seconds_played // 3600 // 24} Dias {user.total_seconds_played // 3600 % 24} Horas (Total de {user.total_seconds_played // 3600} Horas)")
+            embed.add_field(name='Contagem de Rankings',value=f"\n<:SSH:851124299791859772> {user.count_rank_ssh}\n<:SS:851124299574149202> {user.count_rank_ss}\n<:SH:851124299817549855> {user.count_rank_sh}\n<:rankingS:851124299653447710> {user.count_rank_s}\n<:rankingA:851124299535614013> {user.count_rank_a}")
+            try:
+                best = osu.get_user_best(user,limit=5)
+                a = ""
+                cont = 0
+                for i in best:
+                    cont += 1
+                    beat = osu.get_beatmaps(beatmap_id=i.beatmap_id,limit=1)[0]
+                    a += f"{cont}. {beat.title}\n**{round(i.pp)}**PP | Mods: +{i.enabled_mods.shortname if i.enabled_mods.shortname != '' else 'NM'}\n\n"
+                embed.add_field(name='Melhores Pontuações',value=a,inline=False)
+            except:
+                embed.add_field(name='Melhores Pontuações',value="Algum erro aconteceu e não consegui carregar a pontuação.",inline=False)
+            embed.color = p
+            embed.set_thumbnail(url=user.profile_image)
+            await ctx.send(embed=embed)
+        except: 
+                await ctx.send("Não consegui encontrar o seu perfil")
+                return
 class ServerManagement(commands.Cog):
 
     @commands.command(name="addemoji", description="Adicione um emoji no servidor fácil!",aliases=['aemoji','adicionar_emoji'],help=f"Exemplos:\n\nAdicionar um emoji com uma imagem:\n`!!addemoji flushed <arquivo>`\n\nAdicionar um emoji com um emoji de outro servidor (Precisa de nitro):\n`!!addemoji flushed :ultraflushed:`\n\nAdicionar um emoji com a foto de perfil de alguém:\n`!!addemoji burro @darky#0000`\n\nAdicionar um emoji com um link:\n`!!addemoji algo https:://coisas/imagem.png`\n\nFormatos aceitados: [PNG/JPEG/JPG/WEBM/GIF]")
@@ -302,6 +373,8 @@ class ServerManagement(commands.Cog):
         await ctx.send(f"Emoji adicionado: {str(em)}!\n{warning}")
         os.remove(f"temp/image{emoji_ext}")
 
+
+    
 
 bot.add_cog(ServerManagement(bot))
 bot.add_cog(Utilidade(bot))
